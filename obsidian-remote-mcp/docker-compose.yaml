@@ -1,0 +1,12 @@
+version: "3.9"
+services:
+  obsidian-remote-mcp:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      VAULT_PATHS: /vaults
+    volumes:
+      - ./vaults:/vaults
+    restart: unless-stopped
