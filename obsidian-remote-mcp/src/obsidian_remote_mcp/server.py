@@ -184,9 +184,19 @@ class NoteService:
         except Exception as exc:
             return {"ok": False, "error": str(exc)}
 
-    def search_vault(self, root: str, query: str, max_results: int = 50) -> dict[str, Any]:
+    def search_vault(
+        self, query: str, root: str | None = None, max_results: int = 50
+    ) -> dict[str, Any]:
         try:
-            vault_root = resolve_directory_path(root, self.vaults)
+            if root is None:
+                if len(self.vaults) == 1:
+                    vault_root = next(iter(self.vaults.values())).root
+                else:
+                    raise ValueError(
+                        "Multiple vaults configured; specify the 'root' parameter"
+                    )
+            else:
+                vault_root = resolve_directory_path(root, self.vaults)
             results = search_vault_content(vault_root, query, max_results)
             return {"ok": True, "ids": results}
         except Exception as exc:
@@ -292,12 +302,16 @@ def create_server(settings: Settings | None = None) -> tuple[FastMCP, list[Middl
         return service.rename_tag(old, new, root)
 
     @tool()
-    async def search_vault(root: str, query: str, max_results: int = 50) -> dict[str, Any]:
-        return service.search_vault(root, query, max_results)
+    async def search_vault(
+        query: str, root: str | None = None, max_results: int = 50
+    ) -> dict[str, Any]:
+        return service.search_vault(query, root, max_results)
 
     @tool(name="search")
-    async def search_alias(root: str, query: str, max_results: int = 50) -> dict[str, Any]:
-        return service.search_vault(root, query, max_results)
+    async def search_alias(
+        query: str, root: str | None = None, max_results: int = 50
+    ) -> dict[str, Any]:
+        return service.search_vault(query, root, max_results)
 
     @tool()
     async def fetch(note_id: str) -> dict[str, Any]:
