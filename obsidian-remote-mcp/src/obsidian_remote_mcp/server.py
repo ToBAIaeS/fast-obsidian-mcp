@@ -10,6 +10,7 @@ from typing import Any, TypeVar, cast
 
 from dotenv import load_dotenv
 from fastmcp import FastMCP
+from starlette.middleware import Middleware
 
 from .paths import (
     Vault,
@@ -20,7 +21,7 @@ from .paths import (
 )
 from .search import fetch as fetch_note
 from .search import search_vault as search_vault_content
-from .security import apply_security
+from .security import build_security_middleware
 from .tags import add_tags as add_tags_to_note
 from .tags import manage_tags as read_tags
 from .tags import remove_tags as remove_tags_from_note
@@ -224,26 +225,21 @@ def load_settings() -> Settings:
     )
 
 
-def create_server(settings: Settings | None = None) -> FastMCP:
-    """Create a configured :class:`FastMCP` instance."""
+def create_server(settings: Settings | None = None) -> tuple[FastMCP, list[Middleware]]:
+    """Create a configured :class:`FastMCP` instance and its security middleware."""
 
     settings = settings or load_settings()
-    server: Any = FastMCP(
+    server = FastMCP(
         "Obsidian Remote",
         instructions="Remote Obsidian MCP for ChatGPT",
     )
 
-    apply_security(server.app, settings.shared_secret)
+    security_middleware = build_security_middleware(settings.shared_secret)
 
     service = NoteService(settings.vaults)
-    app: Any = server.app
 
     def tool(*args: Any, **kwargs: Any) -> Callable[[TToolFunc], TToolFunc]:
         decorator = server.tool(*args, **kwargs)
-        return cast(Callable[[TToolFunc], TToolFunc], decorator)
-
-    def app_get(path: str) -> Callable[[TToolFunc], TToolFunc]:
-        decorator = app.get(path)
         return cast(Callable[[TToolFunc], TToolFunc], decorator)
 
     @tool()
@@ -309,19 +305,24 @@ def create_server(settings: Settings | None = None) -> FastMCP:
     async def fetch(note_id: str) -> dict[str, Any]:
         return service.fetch(note_id)
 
-    @app_get("/mcp/health")
+    @server.custom_route("/mcp/health", methods=["GET"])
     async def health() -> dict[str, str]:
         return {"status": "ok"}
 
-    return cast(FastMCP, server)
+    return cast(FastMCP, server), security_middleware
 
 
 def main() -> None:
     """Run the FastMCP server."""
 
     settings = load_settings()
-    server = create_server(settings)
-    server.run(transport="http", host=settings.host, port=settings.port)
+    server, security_middleware = create_server(settings)
+    server.run(
+        transport="http",
+        host=settings.host,
+        port=settings.port,
+        middleware=security_middleware,
+    )
 
 
 if __name__ == "__main__":
