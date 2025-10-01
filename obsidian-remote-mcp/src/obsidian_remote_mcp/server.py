@@ -202,9 +202,15 @@ class NoteService:
         except Exception as exc:
             return {"ok": False, "error": str(exc)}
 
-    def fetch(self, note_id: str) -> dict[str, Any]:
+    def fetch(
+        self, note_id: str | None = None, *, id: str | None = None
+    ) -> dict[str, Any]:
+        identifier = id if id is not None else note_id
+        if identifier is None:
+            return {"ok": False, "error": "Missing note identifier"}
+
         try:
-            path = resolve_note_path(note_id, self.vaults)
+            path = resolve_note_path(identifier, self.vaults)
             data = fetch_note(str(path))
             return {"ok": True, **data}
         except Exception as exc:
@@ -314,8 +320,13 @@ def create_server(settings: Settings | None = None) -> tuple[FastMCP, list[Middl
         return service.search_vault(query, root, max_results)
 
     @tool()
-    async def fetch(note_id: str) -> dict[str, Any]:
-        return service.fetch(note_id)
+    async def fetch(
+        id: str | None = None, note_id: str | None = None
+    ) -> dict[str, Any]:
+        if id is None and note_id is None:
+            return {"ok": False, "error": "Either 'id' or 'note_id' must be provided"}
+
+        return service.fetch(note_id, id=id)
 
     @server.custom_route("/mcp/health", methods=["GET"])
     async def health() -> dict[str, str]:

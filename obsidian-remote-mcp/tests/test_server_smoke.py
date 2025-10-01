@@ -25,6 +25,13 @@ def test_note_service_smoke(tmp_path):
     fetch = service.fetch(search["ids"][0])
     assert fetch["ok"] and fetch["content"]
 
+    fetch_by_id = service.fetch(id=search["ids"][0])
+    assert fetch_by_id["ok"] and fetch_by_id["content"]
+
+    missing_identifier = service.fetch(note_id=None, id=None)
+    assert not missing_identifier["ok"]
+    assert "missing" in missing_identifier["error"].lower()
+
     rename = service.rename_tag("demo", "demo-renamed", "vault")
     assert rename["replacements"] >= 1
 
