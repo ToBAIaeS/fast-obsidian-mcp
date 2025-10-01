@@ -21,7 +21,7 @@ and container-friendly packaging.
 
 * **FastMCP HTTP transport** compatible with ChatGPT connectors and Deep Research.
 * **Vault safety** – all file operations are constrained to configured vault roots.
-* **Shared-secret authentication** via the `x-mcp-secret` header on every MCP request.
+* **Optional shared-secret authentication** via the `x-mcp-secret` header on MCP requests.
 * Full suite of tools mirroring Obsidian actions:
   - `list_available_vaults`
   - `read_note`
@@ -44,15 +44,19 @@ and container-friendly packaging.
 
 ## Security model
 
-All MCP HTTP requests must include a shared secret header:
+When `MCP_SHARED_SECRET` is set, all MCP HTTP requests must include a shared secret header:
 
 ```
 x-mcp-secret: <your-secret>
 ```
 
-The secret is required at startup via the `MCP_SHARED_SECRET` environment variable. A
-request missing or providing the wrong secret receives a 401 response. Only the `/mcp/health`
+The secret is configured via the `MCP_SHARED_SECRET` environment variable. A request
+missing or providing the wrong secret receives a 401 response. Only the `/mcp/health`
 endpoint is exempt so you can probe liveness.
+
+If you omit `MCP_SHARED_SECRET` the server skips the authentication middleware and accepts
+unauthenticated requests. This is useful for ChatGPT connectors today, which only support
+OAuth or no authentication, but it should only be used for trusted, private deployments.
 
 Every file system path is resolved and validated to ensure it remains inside one of the
 configured vault roots. Symlink traversal, `..` escapes and cross-vault access are blocked.
@@ -62,7 +66,7 @@ configured vault roots. Symlink traversal, `..` escapes and cross-vault access a
 | Environment variable | Description | Default |
 | -------------------- | ----------- | ------- |
 | `VAULT_PATHS`        | Comma-separated absolute paths to Obsidian vault roots (required) | – |
-| `MCP_SHARED_SECRET`  | Shared secret required for all MCP requests (required) | – |
+| `MCP_SHARED_SECRET`  | Shared secret for MCP requests (optional, recommended) | – |
 | `HOST`               | Bind host | `0.0.0.0` |
 | `PORT`               | HTTP port | `8000` |
 | `LOG_LEVEL`          | Python logging level | `info` |
@@ -73,7 +77,7 @@ Copy `.env.example` to `.env` and update the values before running locally or in
 
 ```bash
 cp .env.example .env
-# edit .env with your vault paths (absolute) and shared secret
+# edit .env with your vault paths (absolute) and optional shared secret
 python3.11 -m venv .venv
 source .venv/bin/activate
 make setup
@@ -178,9 +182,10 @@ when something fails.
 1. Enable **Developer Mode** in ChatGPT.
 2. Create a new **Model Context Protocol (MCP) connector**.
 3. Set the Server URL to `https://YOUR_HOST:PORT/mcp/` (include the trailing slash).
-4. Add a custom header `x-mcp-secret: <your-secret>`. If the UI does not support custom
-   headers, place the MCP server behind a reverse proxy (e.g. Nginx) that injects the header
-   before forwarding requests.
+4. If you configured `MCP_SHARED_SECRET`, add a custom header `x-mcp-secret: <your-secret>`.
+   When the UI does not support custom headers, place the MCP server behind a reverse proxy
+   (e.g. Nginx) that injects the header before forwarding requests. If you left the secret
+   unset, skip this step.
 5. Save and enable the connector for your conversations.
 
 The connector can now call tools like `search`, `fetch`, `read_note`, etc.

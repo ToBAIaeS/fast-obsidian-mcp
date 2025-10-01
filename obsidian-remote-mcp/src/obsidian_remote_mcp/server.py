@@ -37,7 +37,7 @@ class Settings:
     vaults: Mapping[str, Vault]
     host: str
     port: int
-    shared_secret: str
+    shared_secret: str | None
     log_level: str
 
 
@@ -210,8 +210,6 @@ def load_settings() -> Settings:
     host = os.environ.get("HOST", "0.0.0.0")  # noqa: S104 (intentional bind)
     port = int(os.environ.get("PORT", "8000"))
     shared_secret = os.environ.get("MCP_SHARED_SECRET")
-    if not shared_secret:
-        raise RuntimeError("MCP_SHARED_SECRET must be configured")
 
     log_level = os.environ.get("LOG_LEVEL", "info").upper()
     logging.basicConfig(level=getattr(logging, log_level, logging.INFO))
