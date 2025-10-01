@@ -34,18 +34,24 @@ class SharedSecretMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
-def build_security_middleware(secret: str) -> list[Middleware]:
-    """Create the middleware enforcing the shared secret and CORS defaults."""
+def build_security_middleware(secret: str | None) -> list[Middleware]:
+    """Create the security middleware stack.
 
-    if not secret:
-        raise ValueError("Shared secret must be configured")
+    If a shared secret is configured, enforce it on every request (except health checks).
+    Otherwise return only the permissive CORS middleware so unauthenticated deployments
+    remain functional.
+    """
 
-    return [
-        Middleware(SharedSecretMiddleware, secret=secret),
+    middleware: list[Middleware] = [
         Middleware(
             CORSMiddleware,
             allow_origins=["*"],
             allow_methods=["POST"],
             allow_headers=["*"],
-        ),
+        )
     ]
+
+    if secret:
+        middleware.insert(0, Middleware(SharedSecretMiddleware, secret=secret))
+
+    return middleware
