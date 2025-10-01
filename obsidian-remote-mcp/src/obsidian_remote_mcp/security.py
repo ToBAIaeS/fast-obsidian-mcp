@@ -3,18 +3,19 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from typing import Any, cast
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import HTTPException, Request
+from starlette.middleware import Middleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import Response
+from starlette.types import ASGIApp
 
 
 class SharedSecretMiddleware(BaseHTTPMiddleware):
     """Middleware enforcing a shared secret header on requests."""
 
-    def __init__(self, app: FastAPI, secret: str) -> None:
+    def __init__(self, app: ASGIApp, secret: str) -> None:
         super().__init__(app)
         if not secret:
             raise ValueError("Shared secret must be configured")
@@ -33,14 +34,18 @@ class SharedSecretMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
-def apply_security(app: FastAPI, secret: str) -> None:
-    """Configure middleware enforcing the shared secret and CORS defaults."""
+def build_security_middleware(secret: str) -> list[Middleware]:
+    """Create the middleware enforcing the shared secret and CORS defaults."""
 
-    middleware = cast(Any, SharedSecretMiddleware)
-    app.add_middleware(middleware, secret=secret)
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_methods=["POST"],
-        allow_headers=["*"],
-    )
+    if not secret:
+        raise ValueError("Shared secret must be configured")
+
+    return [
+        Middleware(SharedSecretMiddleware, secret=secret),
+        Middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_methods=["POST"],
+            allow_headers=["*"],
+        ),
+    ]
