@@ -320,13 +320,14 @@ def create_server(settings: Settings | None = None) -> tuple[FastMCP, list[Middl
         return service.search_vault(query, root, max_results)
 
     @tool()
-    async def fetch(
-        id: str | None = None, note_id: str | None = None
-    ) -> dict[str, Any]:
-        if id is None and note_id is None:
+    async def fetch(id: str, note_id: str | None = None) -> dict[str, Any]:
+        identifier = id or note_id
+        if identifier is None:
             return {"ok": False, "error": "Either 'id' or 'note_id' must be provided"}
 
-        return service.fetch(note_id, id=id)
+        if id:
+            return service.fetch(id=id)
+        return service.fetch(identifier)
 
     @server.custom_route("/mcp/health", methods=["GET"])
     async def health() -> dict[str, str]:
